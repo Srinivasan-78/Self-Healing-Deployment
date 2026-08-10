@@ -1,0 +1,54 @@
+name: Self-Healing Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target_version:
+        description: "Version tag to deploy"
+        required: true
+        default: "v1"
+      force_fail:
+        description: "Simulate a broken deploy (chaos test)"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ansible
+        run: pip install ansible
+
+      - name: Resolve version tag
+        id: version
+        run: |
+          if [ "${{ github.event.inputs.target_version }}" != "" ]; then
+            echo "version=${{ github.event.inputs.target_version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy with self-healing gate
+        working-directory: ansible
+        run: |
+          ansible-playbook -i inventory.ini deploy.yml \
+            -e "target_version=${{ steps.version.outputs.version }}" \
+            -e "force_fail=${{ github.event.inputs.force_fail || 'false' }}"
+
+      - name: Upload deployment log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-log
+          path: deployment_log/deployments.json
