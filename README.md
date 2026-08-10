@@ -55,27 +55,15 @@ dashboard/index.html    Deployment history timeline (success/rollback events)
 .github/workflows/deploy.yml  CI entrypoint — same playbook, runs in Actions
 ```
 
-## Running it locally
+## Running it
 
-Requires Docker and Ansible (`pip install ansible`).
+Everything runs through GitHub Actions — no local Docker/Ansible needed.
 
-```bash
-# Good deploy — new version passes health check, old version is discarded
-make deploy VERSION=v1
-
-# Bad deploy — health gate fails, pipeline auto-rolls-back to v1
-make chaos VERSION=v2-broken
-
-# View the dashboard
-make dashboard   # http://localhost:8090/dashboard/
-```
-
-Or run the chaos scenario directly:
-```bash
-cd chaos && ./inject_bad_deploy.sh v2-broken
-```
-
-`make clean` tears down demo containers and clears the log.
+- **Push to `main`** → deploys `target_version={{ github.sha }}`, `force_fail=false`.
+- **Run "Self-Healing Deploy" manually** (Actions tab → Run workflow) → set
+  `target_version` and `force_fail=true` to trigger the rollback path on demand.
+- **Dashboard** publishes automatically to GitHub Pages after each deploy run
+  (one-time setup: Settings → Pages → source: GitHub Actions).
 
 ## What the health gate actually checks
 
@@ -87,9 +75,17 @@ check + retry) rather than a bare curl call, so it fails on slow-but-technically
 
 ## Known limitations
 
-- **Single-host demo.** Deploy/rollback run against local Docker containers
-  (`ansible_connection=local`), not a real fleet — swapping the inventory for
-  real SSH hosts is the only change needed to point this at actual servers.
+- **Single-host demo, runs on the Actions runner itself.** Deploy/rollback
+  target Docker containers on the GitHub-hosted runner
+  (`ansible_connection=local` relative to the runner), not a real fleet —
+  swapping the inventory for real SSH hosts is the only change needed to
+  point this at actual servers.
+- **Containers don't persist across separate workflow runs.** Each push
+  starts a fresh runner, so "previous" only exists within one job's
+  lifetime — a same-run deploy→chaos→rollback sequence works end-to-end,
+  but rolling back to a version deployed in an earlier run would need
+  images pushed to GHCR and pulled by tag instead of relying on a locally
+  renamed container.
 - **Notification webhook is a placeholder.** `vault_notify_webhook_url` points
   at a non-existent endpoint; wire in a real Slack/Teams incoming webhook URL
   via `ansible-vault encrypt` to make it live.
