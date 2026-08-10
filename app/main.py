@@ -1,0 +1,32 @@
+import os
+import time
+from fastapi import FastAPI, Response
+
+app = FastAPI(title="demo-service")
+
+VERSION = os.environ.get("APP_VERSION", "unknown")
+FORCE_FAIL = os.environ.get("FORCE_FAIL", "false").lower() == "true"
+STARTUP_DELAY = float(os.environ.get("STARTUP_DELAY", "0"))
+
+_started_at = time.time()
+time.sleep(STARTUP_DELAY)
+
+
+@app.get("/")
+def root():
+    return {"service": "demo-service", "version": VERSION}
+
+
+@app.get("/health")
+def health(response: Response):
+    """Mirrors the Apache/service validation pattern: HTTP 200 + service-state check."""
+    if FORCE_FAIL:
+        response.status_code = 500
+        return {"status": "unhealthy", "reason": "forced failure (chaos injection)", "version": VERSION}
+    uptime = time.time() - _started_at
+    return {"status": "healthy", "version": VERSION, "uptime_seconds": round(uptime, 2)}
+
+
+@app.get("/version")
+def version():
+    return {"version": VERSION}

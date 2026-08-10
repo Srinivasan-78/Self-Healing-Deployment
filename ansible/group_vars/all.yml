@@ -1,0 +1,15 @@
+---
+# Centralized, environment-agnostic config. Secrets live in vault.yml
+# (ansible-vault encrypted) and are never committed in plaintext —
+# same separation used for the TR vars.yml/vault.yml architecture.
+
+app_name: demo-service
+container_port: 8080
+host_port_active: 8080
+host_port_previous: 8081
+image_name: demo-service
+health_endpoint: /health
+health_retries: 5
+health_delay_seconds: 2
+health_max_response_ms: 1500
+deployment_log_path: "{{ playbook_dir }}/../deployment_log/deployments.json"

@@ -1,1 +1,102 @@
-# Self-Healing-Deployment
+# Self-Healing Deployment Pipeline
+
+A CI/CD pipeline that deploys a service, gates the release behind an automated
+health check, and rolls back to the last-known-good version on failure —
+with the deployment history visualized on a dashboard. Generalizes the
+rollback/validation/DR automation pattern built for production microservices
+at Thomson Reuters into an open, runnable portfolio demo.
+
+## Why this exists
+
+Most "CI/CD demo" repos stop at build-and-deploy. This one demonstrates the
+part that actually matters in production: **what happens when a deploy is
+bad** — fail-fast validation, automatic rollback, event logging, and
+notification, all as code.
+
+## Architecture
+
+```
+GitHub Actions ──▶ Ansible (deploy role) ──▶ new container on active port
+                          │
+                          ▼
+                  health check gate (healthcheck/validate.py)
+                    HTTP 200 + service-state + response-time threshold
+                    retries with backoff
+                          │
+              ┌───────────┴───────────┐
+           healthy                 unhealthy
+              │                       │
+      discard old version      Ansible (rollback role)
+      log "success" event      restore last-known-good
+                                log "rollback" event
+                                notify webhook (Teams/Slack-style)
+                                fail the pipeline run
+```
+
+Every deploy — success or rollback — is appended to
+`deployment_log/deployments.json`, which the dashboard renders as a timeline.
+
+## Repo layout
+
+```
+app/                  Demo FastAPI service with /health endpoint and a
+                       FORCE_FAIL toggle used to simulate a broken deploy
+ansible/
+  deploy.yml           Orchestrating playbook: deploy → health gate → rollback
+  group_vars/all.yml   Centralized config (vars.yml pattern)
+  group_vars/vault.yml Secrets separation pattern (placeholder values only)
+  roles/deploy/         Builds image, runs new version alongside last-known-good
+  roles/rollback/       Restores last-known-good on failed health check
+healthcheck/validate.py Fail-fast HTTP validation framework (retry/backoff,
+                         response-time threshold)
+scripts/log_event.py    Appends deploy/rollback events to the JSON log
+chaos/inject_bad_deploy.sh  Triggers a forced-failure deploy end-to-end
+dashboard/index.html    Deployment history timeline (success/rollback events)
+.github/workflows/deploy.yml  CI entrypoint — same playbook, runs in Actions
+```
+
+## Running it locally
+
+Requires Docker and Ansible (`pip install ansible`).
+
+```bash
+# Good deploy — new version passes health check, old version is discarded
+make deploy VERSION=v1
+
+# Bad deploy — health gate fails, pipeline auto-rolls-back to v1
+make chaos VERSION=v2-broken
+
+# View the dashboard
+make dashboard   # http://localhost:8090/dashboard/
+```
+
+Or run the chaos scenario directly:
+```bash
+cd chaos && ./inject_bad_deploy.sh v2-broken
+```
+
+`make clean` tears down demo containers and clears the log.
+
+## What the health gate actually checks
+
+`healthcheck/validate.py` — HTTP 200 + `status: healthy` body, response time
+under a configurable threshold, retried with backoff before declaring failure.
+Mirrors the Apache/NLB-convergence validation pattern (service state + HTTP
+check + retry) rather than a bare curl call, so it fails on slow-but-technically-
+200 responses too, not just hard errors.
+
+## Known limitations
+
+- **Single-host demo.** Deploy/rollback run against local Docker containers
+  (`ansible_connection=local`), not a real fleet — swapping the inventory for
+  real SSH hosts is the only change needed to point this at actual servers.
+- **Notification webhook is a placeholder.** `vault_notify_webhook_url` points
+  at a non-existent endpoint; wire in a real Slack/Teams incoming webhook URL
+  via `ansible-vault encrypt` to make it live.
+- **No canary/traffic-split.** Rollback is instant cutover (rename containers),
+  not a gradual traffic shift — fine for a demo, a real NLB-backed setup would
+  drain connections first.
+- **Vault file is committed in plaintext** since it holds no real secrets —
+  documents the pattern only; a real deployment must run
+  `ansible-vault encrypt group_vars/vault.yml` and never commit the decrypted
+  file.

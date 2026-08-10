@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Deployment History — demo-service</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; background: #0b0f14; color: #e6edf3; margin: 0; padding: 40px; }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  p.sub { color: #8b949e; font-size: 13px; margin-top: 0; }
+  .event { display: flex; gap: 14px; padding: 14px 0; border-top: 1px solid #21262d; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .success .dot { background: #3fb950; }
+  .rollback .dot { background: #f85149; }
+  .failed .dot { background: #f85149; }
+  .meta { font-size: 12px; color: #8b949e; }
+  .version { font-weight: 600; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+  .success .badge { background: #1a3a1f; color: #3fb950; }
+  .rollback .badge { background: #3a1c1a; color: #f85149; }
+  .reason { color: #8b949e; font-size: 12px; margin-top: 2px; }
+  #empty { color: #8b949e; margin-top: 24px; }
+  input[type=file] { margin-top: 20px; color: #8b949e; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Deployment History</h1>
+  <p class="sub">demo-service · self-healing pipeline</p>
+  <div id="events"></div>
+  <div id="empty" style="display:none;">No deployment_log/deployments.json loaded yet — run a deploy or chaos test, then load the file below.</div>
+  <input type="file" id="fileInput" accept="application/json" />
+</div>
+
+<script>
+function render(events) {
+  const container = document.getElementById("events");
+  const empty = document.getElementById("empty");
+  container.innerHTML = "";
+  if (!events || events.length === 0) {
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  events.slice().reverse().forEach(e => {
+    const div = document.createElement("div");
+    div.className = "event " + e.status;
+    div.innerHTML = `
+      <div class="dot"></div>
+      <div>
+        <div><span class="version">${e.version}</span><span class="badge">${e.status}</span></div>
+        <div class="meta">${e.timestamp}</div>
+        ${e.reason ? `<div class="reason">${e.reason}</div>` : ""}
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+// Try auto-loading the log relative to this file (works when served, not on file://)
+fetch("../deployment_log/deployments.json")
+  .then(r => r.ok ? r.json() : Promise.reject())
+  .then(render)
+  .catch(() => render([]));
+
+document.getElementById("fileInput").addEventListener("change", (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => render(JSON.parse(reader.result));
+  reader.readAsText(file);
+});
+</script>
+</body>
+</html>

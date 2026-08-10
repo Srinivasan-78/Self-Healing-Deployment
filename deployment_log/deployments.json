@@ -1,0 +1,26 @@
+[
+  {
+    "timestamp": "2026-08-01T09:12:00Z",
+    "version": "v1",
+    "status": "success",
+    "reason": null
+  },
+  {
+    "timestamp": "2026-08-03T14:05:00Z",
+    "version": "v2",
+    "status": "success",
+    "reason": null
+  },
+  {
+    "timestamp": "2026-08-05T11:40:00Z",
+    "version": "v3-broken",
+    "status": "rollback",
+    "reason": "health_check_failed"
+  },
+  {
+    "timestamp": "2026-08-05T11:52:00Z",
+    "version": "v3",
+    "status": "success",
+    "reason": null
+  }
+]

@@ -1,0 +1,11 @@
+version: "3.9"
+services:
+  dashboard:
+    image: python:3.12-slim
+    working_dir: /site
+    command: python3 -m http.server 8090
+    volumes:
+      - ./dashboard:/site/dashboard
+      - ./deployment_log:/site/deployment_log
+    ports:
+      - "8090:8090"

@@ -1,0 +1,43 @@
+---
+- name: Record deploy start
+  set_fact:
+    deploy_started_at: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
+
+- name: Build image for target version
+  command: >
+    docker build -t {{ image_name }}:{{ target_version }}
+    {{ playbook_dir }}/../../app
+  changed_when: true
+
+- name: Stop previous "previous" slot if present (cleanup from prior rollback)
+  command: docker rm -f {{ app_name }}-previous
+  failed_when: false
+  changed_when: false
+
+- name: Rename current "active" container to "previous" (keep last-known-good running)
+  command: docker rename {{ app_name }}-active {{ app_name }}-previous
+  failed_when: false
+  changed_when: false
+
+- name: Re-point previous container to previous port
+  command: >
+    docker update --restart=no {{ app_name }}-previous
+  failed_when: false
+  changed_when: false
+
+- name: Start new version on active port
+  command: >
+    docker run -d --rm
+    --name {{ app_name }}-active
+    -p {{ host_port_active }}:{{ container_port }}
+    -e APP_VERSION={{ target_version }}
+    -e FORCE_FAIL={{ force_fail | default('false') }}
+    {{ image_name }}:{{ target_version }}
+  changed_when: true
+
+- name: Wait for container to accept connections
+  wait_for:
+    port: "{{ host_port_active }}"
+    host: localhost
+    delay: 1
+    timeout: 15
