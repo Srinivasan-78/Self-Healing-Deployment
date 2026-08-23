@@ -7,33 +7,53 @@
   command: >
     docker build -t {{ image_name }}:{{ target_version }}
     {{ playbook_dir }}/../app
-  changed_when: true
+  register: build_result
+  failed_when: false
+  changed_when: build_result.rc == 0
 
-- name: Stop previous "previous" slot if present (cleanup from prior rollback)
+# Only touch existing containers once we know we have an image to deploy.
+# A failed build must leave the currently-serving version completely alone.
+- name: Remove stale "previous" slot left over from an earlier rollback
   command: docker rm -f {{ app_name }}-previous
+  when: build_result.rc == 0
   failed_when: false
   changed_when: false
 
-- name: Rename current "active" container to "previous" (keep last-known-good running)
-  command: docker rename {{ app_name }}-active {{ app_name }}-previous
+- name: Look up the currently active container
+  command: docker ps -aq --filter name=^{{ app_name }}-active$
+  register: active_container
   failed_when: false
   changed_when: false
 
-- name: Re-point previous container to previous port
-  command: >
-    docker update --restart=no {{ app_name }}-previous
-  failed_when: false
-  changed_when: false
+# The active container holds host_port_active. It must be stopped (not removed)
+# before the new version can bind the same port, and kept on disk so a rollback
+# can restart it. This is why the container is not run with --rm.
+- name: Demote current active container to last-known-good
+  when:
+    - build_result.rc == 0
+    - active_container.stdout | trim | length > 0
+  block:
+    - name: Stop active container so it releases the active port
+      command: docker stop {{ app_name }}-active
+      failed_when: false
+      changed_when: true
+
+    - name: Rename active container to "previous"
+      command: docker rename {{ app_name }}-active {{ app_name }}-previous
+      changed_when: true
 
 - name: Start new version on active port
   command: >
-    docker run -d --rm
+    docker run -d
     --name {{ app_name }}-active
     -p {{ host_port_active }}:{{ container_port }}
     -e APP_VERSION={{ target_version }}
-    -e FORCE_FAIL={{ force_fail | default('false') }}
+    -e FORCE_FAIL={{ force_fail }}
     {{ image_name }}:{{ target_version }}
-  changed_when: true
+  register: start_new
+  when: build_result.rc == 0
+  failed_when: false
+  changed_when: start_new.rc == 0
 
 - name: Wait for container to accept connections
   wait_for:
@@ -41,3 +61,17 @@
     host: localhost
     delay: 1
     timeout: 15
+  register: wait_new
+  when: start_new.rc | default(1) == 0
+  failed_when: false
+
+- name: Record what this deploy actually did
+  set_fact:
+    deploy_started_ok: >-
+      {{ (build_result.rc == 0)
+         and (start_new.rc | default(1) == 0)
+         and (wait_new.failed | default(true) == false) }}
+    # False when the build failed: nothing was stopped, renamed or started, so
+    # the previously-running version is still serving and rollback must not
+    # tear it down.
+    deploy_touched_containers: "{{ build_result.rc == 0 }}"

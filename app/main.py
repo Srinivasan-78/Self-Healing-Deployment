@@ -8,8 +8,12 @@ VERSION = os.environ.get("APP_VERSION", "unknown")
 FORCE_FAIL = os.environ.get("FORCE_FAIL", "false").lower() == "true"
 STARTUP_DELAY = float(os.environ.get("STARTUP_DELAY", "0"))
 
+# Simulated slow start, before the uptime clock starts, so uptime_seconds
+# reports time since the service was actually ready to serve.
+if STARTUP_DELAY > 0:
+    time.sleep(STARTUP_DELAY)
+
 _started_at = time.time()
-time.sleep(STARTUP_DELAY)
 
 
 @app.get("/")

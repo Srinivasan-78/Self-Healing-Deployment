@@ -16,6 +16,9 @@ on:
         type: choice
         options: ["false", "true"]
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -30,21 +33,29 @@ jobs:
       - name: Install Ansible
         run: pip install ansible
 
+      # Inputs go through env, never straight into the script body, so a
+      # crafted workflow_dispatch input cannot inject shell commands.
       - name: Resolve version tag
         id: version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.target_version }}
+          SHA: ${{ github.sha }}
         run: |
-          if [ "${{ github.event.inputs.target_version }}" != "" ]; then
-            echo "version=${{ github.event.inputs.target_version }}" >> "$GITHUB_OUTPUT"
+          if [ -n "$INPUT_VERSION" ]; then
+            echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
           else
-            echo "version=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "version=$SHA" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Deploy with self-healing gate
         working-directory: ansible
+        env:
+          TARGET_VERSION: ${{ steps.version.outputs.version }}
+          FORCE_FAIL: ${{ github.event.inputs.force_fail || 'false' }}
         run: |
           ansible-playbook -i inventory.ini deploy.yml \
-            -e "target_version=${{ steps.version.outputs.version }}" \
-            -e "force_fail=${{ github.event.inputs.force_fail || 'false' }}"
+            -e "target_version=$TARGET_VERSION" \
+            -e "force_fail=$FORCE_FAIL"
 
       - name: Upload deployment log
         if: always()
@@ -52,3 +63,4 @@ jobs:
         with:
           name: deployment-log
           path: deployment_log/deployments.json
+          if-no-files-found: warn

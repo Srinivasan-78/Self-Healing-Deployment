@@ -1,20 +1,68 @@
 ---
-- name: Stop failed active container
+- name: Look up the last-known-good container
+  command: docker ps -aq --filter name=^{{ app_name }}-previous$
+  register: previous_container
+  failed_when: false
+  changed_when: false
+
+# If the build failed, the deploy role never stopped or replaced anything —
+# the old version is still serving on the active port and removing it here
+# would turn a failed build into an outage.
+- name: Stop and remove the failed active container
   command: docker rm -f {{ app_name }}-active
+  when: (previous_container.stdout | trim | length > 0)
+        or (deploy_touched_containers | default(true) | bool)
   failed_when: false
   changed_when: true
 
-- name: Rename previous (last-known-good) container back to active
-  command: docker rename {{ app_name }}-previous {{ app_name }}-active
-  changed_when: true
+- name: Restore last-known-good version
+  when: previous_container.stdout | trim | length > 0
+  block:
+    - name: Rename previous container back to active
+      command: docker rename {{ app_name }}-previous {{ app_name }}-active
+      changed_when: true
 
-- name: Confirm restored container is reachable
-  wait_for:
-    port: "{{ host_port_active }}"
-    host: localhost
-    delay: 1
-    timeout: 15
+    - name: Start restored container
+      command: docker start {{ app_name }}-active
+      register: start_restored
+      failed_when: false
+      changed_when: start_restored.rc == 0
 
-- name: Record rollback event
+    - name: Confirm restored container is reachable
+      wait_for:
+        port: "{{ host_port_active }}"
+        host: localhost
+        delay: 1
+        timeout: 15
+      register: wait_restored
+      failed_when: false
+
+- name: Report that the previous version was left untouched
+  debug:
+    msg: >-
+      Nothing was deployed (image build failed), so no rollback was needed —
+      the previously running {{ app_name }}-active container is still serving.
+  when:
+    - previous_container.stdout | trim | length == 0
+    - not (deploy_touched_containers | default(true) | bool)
+
+- name: Warn when there is no last-known-good version to restore
+  debug:
+    msg: >-
+      No {{ app_name }}-previous container exists (first deploy, or the previous
+      slot was never created) — nothing to roll back to; the service is down.
+  when:
+    - previous_container.stdout | trim | length == 0
+    - deploy_touched_containers | default(true) | bool
+
+- name: Record rollback outcome
   set_fact:
     rollback_recorded_at: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
+    rollback_restored: >-
+      {{ (previous_container.stdout | trim | length > 0)
+         and (start_restored.rc | default(1) == 0)
+         and (wait_restored.failed | default(true) == false) }}
+    # Build failed before anything was replaced — the old version never stopped.
+    rollback_unnecessary: >-
+      {{ (previous_container.stdout | trim | length == 0)
+         and (not (deploy_touched_containers | default(true) | bool)) }}

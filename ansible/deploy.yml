@@ -5,10 +5,6 @@
   vars_files:
     - group_vars/vault.yml
 
-  vars:
-    target_version: "{{ target_version | default('v1') }}"
-    force_fail: "{{ force_fail | default('false') }}"
-
   tasks:
     - import_role:
         name: deploy
@@ -19,13 +15,26 @@
         --url http://localhost:{{ host_port_active }}{{ health_endpoint }}
         --retries {{ health_retries }}
         --delay {{ health_delay_seconds }}
+        --timeout {{ health_timeout_seconds }}
+        --backoff {{ health_backoff }}
         --max-response-ms {{ health_max_response_ms }}
       register: health_result
+      when: deploy_started_ok | bool
       failed_when: false
       changed_when: false
 
+    - name: Decide whether the deployment is healthy
+      set_fact:
+        deployment_healthy: >-
+          {{ (deploy_started_ok | bool)
+             and (health_result.rc | default(1) == 0) }}
+        failure_reason: >-
+          {{ 'health_check_failed' if (deploy_started_ok | bool)
+             else ('image_build_failed' if build_result.rc != 0
+                   else 'container_start_failed') }}
+
     - name: Deployment healthy — keep new version, discard previous
-      when: health_result.rc == 0
+      when: deployment_healthy | bool
       block:
         - name: Remove now-unneeded previous container
           command: docker rm -f {{ app_name }}-previous
@@ -33,27 +42,36 @@
           changed_when: true
 
         - name: Append success event to deployment log
-          shell: >
+          command: >
             python3 {{ playbook_dir }}/../scripts/log_event.py
             --status success --version {{ target_version }}
             --log-path {{ deployment_log_path }}
           changed_when: false
 
     - name: Deployment unhealthy — trigger rollback
-      when: health_result.rc != 0
+      when: not (deployment_healthy | bool)
       block:
         - debug:
-            msg: "Health check failed for {{ target_version }} — rolling back to last-known-good"
+            msg: "Deployment of {{ target_version }} failed ({{ failure_reason }}) — entering rollback path"
 
         - import_role:
             name: rollback
 
         - name: Append rollback event to deployment log
-          shell: >
-            python3 {{ playbook_dir }}/../scripts/log_event.py
-            --status rollback --version {{ target_version }}
-            --log-path {{ deployment_log_path }}
-            --reason "health_check_failed"
+          command:
+            argv:
+              - python3
+              - "{{ playbook_dir }}/../scripts/log_event.py"
+              - --status
+              - "{{ 'rollback' if (rollback_restored | bool) else 'failed' }}"
+              - --version
+              - "{{ target_version }}"
+              - --log-path
+              - "{{ deployment_log_path }}"
+              - --reason
+              - >-
+                {{ failure_reason if (rollback_restored | bool) or (rollback_unnecessary | bool)
+                   else failure_reason ~ '; no last-known-good to restore' }}
           changed_when: false
 
         - name: Notify webhook of rollback (Teams/Slack-style)
@@ -62,9 +80,14 @@
             method: POST
             body_format: json
             body:
-              text: "Rollback triggered: {{ app_name }} {{ target_version }} failed health check"
+              text: "Rollback triggered: {{ app_name }} {{ target_version }} failed ({{ failure_reason }})"
             status_code: [200, 201, 202, 404]  # 404 expected — webhook URL is a placeholder in this demo
           failed_when: false
 
         - fail:
-            msg: "Deployment of {{ target_version }} failed health checks; rolled back to last-known-good."
+            msg: >-
+              Deployment of {{ target_version }} failed ({{ failure_reason }});
+              {{ 'rolled back to last-known-good.' if (rollback_restored | bool)
+                 else ('nothing was replaced, the previous version is still serving.'
+                       if (rollback_unnecessary | bool)
+                       else 'NO last-known-good container was available to restore — service is down.') }}

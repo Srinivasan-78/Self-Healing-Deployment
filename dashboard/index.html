@@ -44,14 +44,39 @@ function render(events) {
   empty.style.display = "none";
   events.slice().reverse().forEach(e => {
     const div = document.createElement("div");
-    div.className = "event " + e.status;
-    div.innerHTML = `
-      <div class="dot"></div>
-      <div>
-        <div><span class="version">${e.version}</span><span class="badge">${e.status}</span></div>
-        <div class="meta">${e.timestamp}</div>
-        ${e.reason ? `<div class="reason">${e.reason}</div>` : ""}
-      </div>`;
+    div.className = "event " + (e.status || "");
+
+    const dot = document.createElement("div");
+    dot.className = "dot";
+
+    const body = document.createElement("div");
+
+    const head = document.createElement("div");
+    const version = document.createElement("span");
+    version.className = "version";
+    version.textContent = e.version || "(unknown)";
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.textContent = e.status || "";
+    head.appendChild(version);
+    head.appendChild(badge);
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = e.timestamp || "";
+
+    body.appendChild(head);
+    body.appendChild(meta);
+
+    if (e.reason) {
+      const reason = document.createElement("div");
+      reason.className = "reason";
+      reason.textContent = e.reason;
+      body.appendChild(reason);
+    }
+
+    div.appendChild(dot);
+    div.appendChild(body);
     container.appendChild(div);
   });
 }
@@ -66,7 +91,15 @@ document.getElementById("fileInput").addEventListener("change", (ev) => {
   const file = ev.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => render(JSON.parse(reader.result));
+  reader.onload = () => {
+    try {
+      render(JSON.parse(reader.result));
+    } catch (err) {
+      render([]);
+      document.getElementById("empty").textContent =
+        "Could not parse that file as JSON: " + err.message;
+    }
+  };
   reader.readAsText(file);
 });
 </script>

@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -24,11 +25,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The deploy job writes the log on its own runner and never commits it,
+      # so without this the dashboard would only ever show the log committed
+      # in the repo. Pull the log the triggering run produced instead.
+      - name: Download deployment log from the triggering run
+        if: github.event_name == 'workflow_run'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-log
+          path: fresh-log
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Assemble site
         run: |
           mkdir -p _site
           cp dashboard/index.html _site/
-          cp deployment_log/deployments.json _site/deployments.json
+          if [ -f fresh-log/deployments.json ]; then
+            cp fresh-log/deployments.json _site/deployments.json
+          else
+            cp deployment_log/deployments.json _site/deployments.json
+          fi
           sed -i 's|../deployment_log/deployments.json|deployments.json|' _site/index.html
 
       - uses: actions/upload-pages-artifact@v3

@@ -14,7 +14,8 @@ def main():
     parser.add_argument("--reason", default=None)
     args = parser.parse_args()
 
-    os.makedirs(os.path.dirname(args.log_path), exist_ok=True)
+    log_dir = os.path.dirname(os.path.abspath(args.log_path))
+    os.makedirs(log_dir, exist_ok=True)
 
     events = []
     if os.path.exists(args.log_path):
@@ -23,6 +24,8 @@ def main():
                 events = json.load(f)
             except json.JSONDecodeError:
                 events = []
+    if not isinstance(events, list):
+        events = []
 
     events.append(
         {
@@ -33,8 +36,13 @@ def main():
         }
     )
 
-    with open(args.log_path, "w") as f:
+    # Write via a temp file + rename so an interrupted run cannot leave the
+    # log truncated or half-written for the dashboard to read.
+    tmp_path = args.log_path + ".tmp"
+    with open(tmp_path, "w") as f:
         json.dump(events, f, indent=2)
+        f.write("\n")
+    os.replace(tmp_path, args.log_path)
 
 
 if __name__ == "__main__":
