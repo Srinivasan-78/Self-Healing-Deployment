@@ -1,0 +1,92 @@
+{
+  "schema": "authormark/manifest/1",
+  "author": "Srinivasan Vijayaraghavan",
+  "email": "srinivasan.shyam2000@gmail.com",
+  "github": "https://github.com/Srinivasan-78",
+  "sealedAt": "2026-08-29T13:21:32.814Z",
+  "fileCount": 16,
+  "digest": "8c96baab6c70911e7187c2fa482ca4cb0283ce52ca5cc384b72ce0b65d726c70",
+  "proof": "4e442d171b4e96d685e624bd041c483618c134015f162e996654756bdc11bb2c",
+  "files": [
+    {
+      "path": ".github/workflows/authormark.yml",
+      "sha256": "b5cab2b0d7b18cd416758ec39f9677144704f615095f279d00e6f47ed2164e11",
+      "bytes": 1138
+    },
+    {
+      "path": ".github/workflows/dashboard.yml",
+      "sha256": "7d573dc6c9014a8f0ed734febe0167896f0c1954e86066660383243c40f20eec",
+      "bytes": 2388
+    },
+    {
+      "path": ".github/workflows/deploy.yml",
+      "sha256": "04cd6525592bcb154873e890681096aaa3494195a61f0efabe5560a092e79c9b",
+      "bytes": 2601
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "6f4bb78900bf58971b266a4df35ff4137cd210494cc71089ecc7f3feb6130012",
+      "bytes": 1511
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "a4f80ec424ce2382e519318c7cdbc38276dc8575a452e566c67f21c1eb0ca882",
+      "bytes": 822
+    },
+    {
+      "path": "README.md",
+      "sha256": "35afe3447120025c4f77c6d8de6f1fabc0f6eea13a60366bdcaf5eddb8fbf841",
+      "bytes": 13784
+    },
+    {
+      "path": "ansible/deploy.yml",
+      "sha256": "ac16d2c89ef5ff07829f761f0b7ca61dbc03864919c5003893141bfe7501d351",
+      "bytes": 4318
+    },
+    {
+      "path": "ansible/group_vars/all.yml",
+      "sha256": "7beac2cd225c700065e76ecd473952202279472c3fb420d1149e68460577ddc6",
+      "bytes": 1486
+    },
+    {
+      "path": "ansible/group_vars/vault.yml",
+      "sha256": "f8cd4e9d69521c3b34fb80e29f38fa0a01dde55b705ce7976778e07b4fcf5f01",
+      "bytes": 1313
+    },
+    {
+      "path": "ansible/roles/deploy/tasks/main.yml",
+      "sha256": "403ca48b434360cc42b12b637749cddcc9a01bfe7e487f6edbd39dc5be614108",
+      "bytes": 3417
+    },
+    {
+      "path": "ansible/roles/rollback/tasks/main.yml",
+      "sha256": "28ffd3e38fb4f044395ebbc85fea6754bed2856edb37884501928d511c05f67c",
+      "bytes": 3393
+    },
+    {
+      "path": "app/Dockerfile",
+      "sha256": "553861a034987263d601fca9cbff369d7c7a15ac0e9af6df6a7b8183cc93ed62",
+      "bytes": 980
+    },
+    {
+      "path": "app/main.py",
+      "sha256": "39dbba84580afac31cb6f8b429f8c950c1786285627cb1f740e57bb0dc8c4041",
+      "bytes": 1869
+    },
+    {
+      "path": "dashboard/index.html",
+      "sha256": "c3a14816fcaf1dba2a51d4be3ac9ff2a16e05fa42e09408abe11dba3f433c35f",
+      "bytes": 4395
+    },
+    {
+      "path": "healthcheck/validate.py",
+      "sha256": "f7ecae86f7af9a2a00a6b6176d4c2cd4e6beee38817f816a8da4b40f442b9236",
+      "bytes": 3919
+    },
+    {
+      "path": "scripts/log_event.py",
+      "sha256": "e8f630fc57f27d5c9ed8f07bafd2b751d6399eb44a66714dd7ab40b7cdd2696e",
+      "bytes": 2233
+    }
+  ]
+}

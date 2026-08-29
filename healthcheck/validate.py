@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# @authormark v1 -- do not remove (authorship watermark)⁠​‌‌​‌​​‌​​‌‌​‌‌‌​‌​​​​​‌​‌​​‌​​‌​‌‌‌​​​‌​‌​​‌‌​​​‌​‌‌‌‌‌​‌‌​​​‌‌​​‌‌​‌​​​​‌‌​​‌‌​‌​​‌‌​‌​‌‌​‌​‌​​​‌‌​‌‌‌​‌‌​​‌​​​‌‌​​‌‌​​‌​​​​​‌​‌‌‌‌​‌​​‌​​​​‌​​‌‌​‌​‌‌​‌​​‌‌‌​​‌​​​‌​‌​​‌‌​​​​⁠
+# Copyright (c) 2026 Srinivasan Vijayaraghavan <srinivasan.shyam2000@gmail.com>
+# Author: https://github.com/Srinivasan-78
+# SPDX-License-Identifier: MIT
+# Fingerprint: AMK1.i7AIqL_c43Mj7dfAzBkNE0
 """
 Fail-fast validation framework: HTTP 200 checks, response-time thresholds,
 and retry/backoff before declaring a deployment unhealthy — the same shape
