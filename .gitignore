@@ -2,3 +2,9 @@ __pycache__/
 *.pyc
 *.retry
 deployment_log/*.tmp
+
+# Master Bot hygiene additions
+.DS_Store
+Thumbs.db
+.env
+.env.local
